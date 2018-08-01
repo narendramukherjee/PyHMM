@@ -231,7 +231,7 @@ class CategoricalHMM(DiscreteHMM):
     def update_hyperpriors(self):
         """
         Optimize hyperpriors by minimizing KL divergence between posterior and prior distributions of parameters.
-        Uses the minimize_KL helper function.
+        Uses the minimize_KL_Categorical helper function.
         :return:
         """
 
@@ -356,12 +356,13 @@ class IndependentBernoulliHMM(DiscreteHMM):
 
     def M_step(self, data, expected_latent_state, expected_latent_state_pair):
         """
-        Get the parameter settings that maximize the expected log likelihood/log posterior coming from the E step.
-        :param data: Training data. Shape = (num_emissions X number of sequences X length of sequence)
+        Update the start, transition and emission posteriors by adding sufficient statistics of the hidden state
+        posterior to the parameter priors.
+        :param data: Training data. Shape = (number of emissions X number of sequences X length of sequence)
         :param expected_latent_state: Posterior probability of a single state at a time point.
-                 Shape (n_states, shape of data[1:]).
+                 Shape (num_states, shape of data).
         :param expected_latent_state_pair: Posterior probability of pairs of states.
-                 Shape (n_states, n_states, shape of data[1:]).
+                 Shape (num_states, num_states, shape of data).
         :return:
         """
         # Equations 3.54 to 3.59 in Beal thesis
@@ -377,7 +378,7 @@ class IndependentBernoulliHMM(DiscreteHMM):
     def update_hyperpriors(self):
         """
         Optimize hyperpriors by minimizing KL divergence between posterior and prior distributions of parameters.
-        Uses the minimize_KL helper function.
+        Uses the minimize_KL_Bernoulli helper function.
         :return:
         """
         optimizer = minimize(minimize_KL_Bernoulli, np.array([self.start_hyperprior, self.transition_hyperprior,
@@ -391,19 +392,19 @@ class IndependentBernoulliHMM(DiscreteHMM):
             initial_emission_counts, initial_start_counts, update_hyperpriors = True, update_hyperpriors_iter = 1,
             verbose = True):
         """
-        Run the EM algorithm to find the maximum likelihood or maximum a posteriori (if pseudocounts >0) estimates
-        of the model parameters
-        :param data: Training data. Shape = (num_emissions X number of sequences X length of sequence)
-        :param p_transitions: Initial guess for transition probability matrix. Shape = (num_states X num_states)
-        :param p_emissions: Initial guess for emission probability matrix. Shape = (num_states X num_emissions)
-        :param p_start: Initial guess for first state occupancy probability matrix. Shape = (num_states)
-        :param start_pseudocounts: Parameters for Beta prior on first state occupancy. Shape = (num_states)
-        :param transition_pseudocounts: Parameters for Beta priors on transition probabilities.
+        Run the variational inference algorithm in Beal (2003). Assumes symmetric priors on start, transition and
+        emission parameters with hyperpriors that are optimized as well.
+        :param data: Training data. Shape = (number of emissions X number of sequences X length of sequence)
+        :param transition_hyperprior: Hyperprior of transition counts
+        :param emission_hyperprior: Hyperprior of emission counts
+        :param start_hyperprior: Hyperprior of start counts
+        :param initial_transition_counts: Initial guess of posterior transition counts.
                Shape = (num_states X num_states)
-        :param emission_pseudocounts: Parameters for Beta priors on emission probabilities. The emissions consist of
-               num_emission Bernoulli distributed independent emissions, hence their Beta priors have 2 parameters each
-               Shape = (num_states X num_emissions X 2)
-        :param verbose: Show the improvement in log likelihood/log posterior through training. Default = True
+        :param initial_emission_counts: Initial guess of posterior emission counts. Shape = (num_states X num_emissions X 2)
+        :param initial_start_counts: Initial guess of posterior start counts. Shape = (num_states)
+        :param update_hyperpriors: Whether hyperpriors should be updated. Defaults to True.
+        :param update_hyperpriors_iter: Number of iterations between hyperprior update steps. Defaults to 1.
+        :param verbose: Show the improvement in ELBO through training. Default = True
         :return:
         """
         self.transition_hyperprior = transition_hyperprior
