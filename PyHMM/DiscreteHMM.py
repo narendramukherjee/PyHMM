@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.stats import dirichlet
 
 class DiscreteHMM:
     """
@@ -19,7 +19,7 @@ class DiscreteHMM:
         self.num_emissions = int(num_emissions)
         self.max_iter = int(max_iter)
         self.threshold = threshold
-        self.log_likelihood = []
+        self.log_posterior = []
 
     def forward(self):
         """
@@ -163,12 +163,17 @@ class CategoricalHMM(DiscreteHMM):
             self.get_state_likelihood(data.astype("int"))
             alpha, beta, scaling, expected_latent_state, expected_latent_state_pair = self.E_step()
             self.M_step(data.astype("int"), expected_latent_state, expected_latent_state_pair)
-            self.log_likelihood.append(np.sum(np.log(scaling)))
+            current_log_likelihood = np.sum(np.log(scaling))
+            current_log_prior = np.sum([dirichlet.logpdf(self.p_transitions[state, :], self.transition_pseudocounts[state, :])
+                                        + dirichlet.logpdf(self.p_emissions[state, :], self.emission_pseudocounts[state, :])
+                                        for state in range(self.num_states)]) \
+                                + dirichlet.logpdf(self.p_start, self.start_pseudocounts)
+            self.log_posterior.append(current_log_likelihood + current_log_prior)
 
             if iter >= 1:
-                improvement = self.log_likelihood[-1] - self.log_likelihood[-2]
+                improvement = self.log_posterior[-1] - self.log_posterior[-2]
                 if verbose:
-                    print("Training improvement in log likelihood:", improvement)
+                    print("Training improvement in log posterior:", improvement)
                 if improvement <= self.threshold:
                     self.converged = True
                     break
@@ -254,12 +259,20 @@ class IndependentBernoulliHMM(DiscreteHMM):
             self.get_state_likelihood(data.astype("int"))
             alpha, beta, scaling, expected_latent_state, expected_latent_state_pair = self.E_step()
             self.M_step(data.astype("int"), expected_latent_state, expected_latent_state_pair)
-            self.log_likelihood.append(np.sum(np.log(scaling)))
+            current_log_likelihood = np.sum(np.log(scaling))
+            current_log_prior = 0
+            for state in range(self.num_states):
+                current_log_prior += dirichlet.logpdf(self.p_transitions[state, :], self.transition_pseudocounts[state, :])
+                for emission in range(self.num_emissions):
+                    current_log_prior += dirichlet.logpdf([self.p_emissions[state, emission], 1 - self.p_emissions[state, emission]],
+                                                          self.emission_pseudocounts[state, emission, :])
+            current_log_prior += dirichlet.logpdf(self.p_start, self.start_pseudocounts)
+            self.log_posterior.append(current_log_likelihood + current_log_prior)
 
             if iter >= 1:
-                improvement = self.log_likelihood[-1] - self.log_likelihood[-2]
+                improvement = self.log_posterior[-1] - self.log_posterior[-2]
                 if verbose:
-                    print("Training improvement in log likelihood:", improvement)
+                    print("Training improvement in log posterior:", improvement)
                 if improvement <= self.threshold:
                     self.converged = True
                     break
