@@ -236,8 +236,8 @@ class CategoricalHMM(DiscreteHMM):
         """
 
         optimizer = minimize(minimize_KL_Categorical, np.array([self.start_hyperprior, self.transition_hyperprior,
-                                                    self.emission_hyperprior]), args = (self,),
-                             constraints = {"type": "ineq", "fun": lambda x: x})
+                                                    self.emission_hyperprior]),
+                             args = (self,), bounds=((0, np.inf), (0, np.inf), (0, np.inf)))
         self.start_hyperprior = optimizer["x"][0]
         self.transition_hyperprior = optimizer["x"][1]
         self.emission_hyperprior = optimizer["x"][2]
@@ -382,8 +382,9 @@ class IndependentBernoulliHMM(DiscreteHMM):
         :return:
         """
         optimizer = minimize(minimize_KL_Bernoulli, np.array([self.start_hyperprior, self.transition_hyperprior,
-                                                    self.emission_hyperprior]), args = (self,),
-                             constraints = {"type": "ineq", "fun": lambda x: x})
+                                                              self.emission_hyperprior]),
+                             args = (self,), bounds = ((0, np.inf), (0, np.inf), (0, np.inf)))
+
         self.start_hyperprior = optimizer["x"][0]
         self.transition_hyperprior = optimizer["x"][1]
         self.emission_hyperprior = optimizer["x"][2]
